@@ -1,0 +1,25 @@
+GPIO_InitStruct.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(LED_BLINK_PORT, &GPIO_InitStruct);
+   
+    GPIO_ResetBits(LED_BLINK_PORT, LED_BLINK_PIN);
+
+  
+    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IPU; 
+    GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+static void USART2_SendChar(char c)
+{
+    while(USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
+    USART_SendData(USART2, c);
+}
+
+static void USART2_SendString(const char *str)
+{
+    while(*str)
+    {
+        USART2_SendChar(*str++);
+    }
+}
