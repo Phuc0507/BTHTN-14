@@ -1,0 +1,56 @@
+UART_SendString("\n\n--- Sleep demo (WFI/WFE) + UART ---\n");
+  UART_SendString("USART1 @ "); UART_SendUInt(UART_BAUD); UART_SendString(" bps\n");
+  UART_SendString("Mode: "); UART_SendString(USE_WFI ? "WFI" : "WFE"); UART_SendString("\n");
+  UART_SendString("EXTI wake: "); UART_SendString(USE_EXTI_WAKE ? "EN" : "DIS"); UART_SendString("\n");
+
+  /* 1) LED PB12 output */
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+  GPIO_InitTypeDef io; GPIO_StructInit(&io);
+  io.GPIO_Pin   = GPIO_Pin_12;
+  io.GPIO_Speed = GPIO_Speed_2MHz;
+  io.GPIO_Mode  = GPIO_Mode_Out_PP;
+  GPIO_Init(GPIOB, &io);
+
+  /* 2) Blink 5 times */
+  UART_SendString("Blinking PB12 x5 ...\n");
+  for(int i=0;i<5;i++){
+    GPIO_SetBits(GPIOB, GPIO_Pin_12);   // ON (tùy cách đấu LED)
+    tiny_delay_ms(300);
+    GPIO_ResetBits(GPIOB, GPIO_Pin_12); // OFF
+    tiny_delay_ms(300);
+  }
+
+  /* 3) Tắt LED, giải phóng & tắt clock GPIOB để tiết kiệm */
+  GPIO_ResetBits(GPIOB, GPIO_Pin_12);
+  GPIO_DeInit(GPIOB);
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, DISABLE);
+
+  /* 4) Chuẩn bị Sleep (không deep-sleep) */
+  SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+
+#if USE_EXTI_WAKE
+  Wake_PA0_EXTI_Falling_Init();
+  UART_SendString("Wake source: EXTI0 (PA0, falling). Press button to wake.\n");
+#else
+  UART_SendString("No wake source configured. MCU will sleep indefinitely.\n");
+#endif
+
+#if USE_WFI
+  UART_SendString("Entering Sleep via WFI...\n");
+  __WFI();                              // chờ INTERRUPT
+#else
+  UART_SendString("Entering Sleep via WFE...\n");
+  SCB->SCR |= SCB_SCR_SEVONPEND_Msk;    // pending IRQ cũng tạo EVENT (giúp WFE thức dậy)
+  __SEV(); __WFE(); __WFE();            // khử event tồn đọng, rồi ngủ chờ EVENT mới
+#endif
+
+  /* 6) Chạy tiếp sau khi được đánh thức (nếu có) */
+  if (g_woke_by_exti0){
+    UART_SendString("Woke up by EXTI0 (PA0)\n");
+  } else {
+    UART_SendString("Woke up (source not flagged)\n");
+  }
+
+  UART_SendString("Idle loop...\n");
+  while(1){ __NOP(); }
+}
